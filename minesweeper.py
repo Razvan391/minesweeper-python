@@ -3,14 +3,49 @@ from tkinter import messagebox
 import random
 
 class Minesweeper:
-    def __init__(self, root, rows=9, cols=9, mines=10):
+    def __init__(self, root):
         self.root = root
         self.root.title("Minesweeper Python")
+        self.root.resizable(False, False)
         
-        self.rows = rows
-        self.cols = cols
-        self.mines_count = mines
+        # Configurații: (rânduri_verticală, coloane_laterală, număr_bombe)
+        self.difficulties = {
+            "Easy": (9, 9, 10),
+            "Medium": (12, 12, 22),
+            "Hard": (20, 9, 35)
+        }
         
+        self.current_diff = "Easy"
+        self.top_frame = tk.Frame(self.root, pady=5)
+        self.top_frame.pack()
+        
+        self.board_frame = tk.Frame(self.root)
+        self.board_frame.pack(padx=5, pady=5)
+        
+        self.setup_difficulty_bar()
+        self.start_game("Easy")
+        
+    def setup_difficulty_bar(self):
+        """Creează butoanele de selectare a dificultății."""
+        for diff_name in self.difficulties:
+            btn = tk.Button(
+                self.top_frame,
+                text=diff_name,
+                width=8,
+                font=("Helvetica", 10, "bold"),
+                command=lambda d=diff_name: self.start_game(d)
+            )
+            btn.pack(side=tk.LEFT, padx=3)
+
+    def start_game(self, difficulty):
+        """Resetează tabla și inițializează un joc nou pe dificultatea aleasă."""
+        self.current_diff = difficulty
+        self.rows, self.cols, self.mines_count = self.difficulties[difficulty]
+        
+        # Curăță tabla anterioară
+        for widget in self.board_frame.winfo_children():
+            widget.destroy()
+            
         self.buttons = {}
         self.mine_positions = set()
         self.revealed_count = 0
@@ -18,30 +53,28 @@ class Minesweeper:
         
         self.setup_ui()
         self.place_mines()
-        
+
     def setup_ui(self):
         """Creează grila de butoane pe ecran."""
         for r in range(self.rows):
             for c in range(self.cols):
                 btn = tk.Button(
-                    self.root, 
+                    self.board_frame, 
                     text="", 
                     width=3, 
                     height=1, 
-                    font=("Helvetica", 12, "bold"),
+                    font=("Helvetica", 11, "bold"),
                     bg="#c0c0c0",
                     relief="raised"
                 )
-                # Click stânga pentru a săpa (descoperi)
                 btn.bind("<Button-1>", lambda e, r=r, c=c: self.on_click(r, c))
-                # Click dreapta pentru a pune/scoate stegulețul
                 btn.bind("<Button-3>", lambda e, r=r, c=c: self.on_right_click(r, c))
                 
                 btn.grid(row=r, column=c)
                 self.buttons[(r, c)] = {
                     "widget": btn,
                     "is_mine": False,
-                    "state": "hidden",  # "hidden", "revealed", "flagged"
+                    "state": "hidden",
                     "adjacent_mines": 0
                 }
 
@@ -53,7 +86,6 @@ class Minesweeper:
         for r, c in self.mine_positions:
             self.buttons[(r, c)]["is_mine"] = True
             
-        # Calculează numărul de bombe adiacente pentru fiecare celulă
         for r in range(self.rows):
             for c in range(self.cols):
                 if not self.buttons[(r, c)]["is_mine"]:
@@ -78,27 +110,22 @@ class Minesweeper:
             return
             
         cell = self.buttons[(r, c)]
-        
-        # Ignoră celulele deja descoperite sau marcate cu steguleț
         if cell["state"] != "hidden":
             return
             
-        # AI LOVIT O BOMBĂ!
         if cell["is_mine"]:
             cell["widget"].config(text="💣", bg="red")
             self.end_game(won=False)
             return
 
-        # Săpătură în celulă sigură
         self.reveal_cell(r, c)
         
-        # Verifică dacă ai câștigat
         total_safe_cells = (self.rows * self.cols) - self.mines_count
         if self.revealed_count == total_safe_cells:
             self.end_game(won=True)
 
     def reveal_cell(self, r, c):
-        """Descoperă o celulă și extinde automat zonele libere (Recursivitate)."""
+        """Descoperă o celulă și extinde automat zonele libere."""
         cell = self.buttons[(r, c)]
         if cell["state"] != "hidden":
             return
@@ -108,14 +135,11 @@ class Minesweeper:
         
         mines = cell["adjacent_mines"]
         btn = cell["widget"]
-        
-        # Culori specifice pentru fiecare număr
         colors = {1: "blue", 2: "green", 3: "red", 4: "darkblue", 5: "maroon", 6: "cyan", 7: "black", 8: "gray"}
         
         if mines > 0:
             btn.config(text=str(mines), fg=colors.get(mines, "black"), bg="#e0e0e0", relief="sunken")
         else:
-            # Dacă sunt 0 bombe vecine, lasă spațiu gol și deschide automat vecinii
             btn.config(text="", bg="#e0e0e0", relief="sunken")
             for dr in [-1, 0, 1]:
                 for dc in [-1, 0, 1]:
@@ -145,7 +169,6 @@ class Minesweeper:
         """Afișează mesajul de final și dezvăluie toate bombele."""
         self.game_over = True
         
-        # Arată toate bombele
         for (r, c), cell in self.buttons.items():
             if cell["is_mine"]:
                 if not won:
@@ -154,11 +177,11 @@ class Minesweeper:
                     cell["widget"].config(text="🚩", fg="green")
                     
         if won:
-            messagebox.showinfo("Minesweeper", "Felicitări! Ai găsit toate zonele libere și ai evitat bombele!")
+            messagebox.showinfo("Minesweeper", f"Felicitări! Ai câștigat pe nivelul {self.current_diff}!")
         else:
-            messagebox.showerror("Minesweeper", "BOOM! Ai călcat pe o bombă. Joc încheiat!")
+            messagebox.showerror("Minesweeper", "BOOM! Ai călcat pe o bombă. Apasă pe o dificultate pentru a reîncepe.")
 
 if __name__ == "__main__":
     root = tk.Tk()
-    game = Minesweeper(root, rows=9, cols=9, mines=10)
+    game = Minesweeper(root)
     root.mainloop()
